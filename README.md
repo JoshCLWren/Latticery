@@ -2,6 +2,8 @@
 
 **Autonomous software delivery across the work lattice.**
 
+![Latticery work lattice](assets/latticery-work-lattice.webp)
+
 Latticery is a graph-engineered software delivery system for coordinating interchangeable AI workers across real software work.
 
 The durable thing is not an agent session. It is the **work lattice**: dependencies, leases, implementation, review, verification gates, recovery paths, and explicit human boundaries. Workers enter that lattice, perform bounded work, leave durable state behind, and can be replaced without losing the system's understanding of what comes next.
