@@ -68,6 +68,10 @@ def repair(path: Path) -> bool:
 
     if path.parent.name == "workflows":
         text = text.replace("JoshCLWren/comic-pile", "${{ github.repository }}")
+        # Runtime-facing names and synthetic smoke-test titles belong to the
+        # extracted host, not to ComicPile. Persisted lowercase protocol marker
+        # names remain untouched for cutover compatibility.
+        text = text.replace("ComicPile", "Latticery")
 
     if text != original:
         path.write_text(text, encoding="utf-8")
@@ -87,7 +91,10 @@ def audit(paths: list[Path]) -> None:
     failures: list[str] = []
     for path in paths:
         text = path.read_text(encoding="utf-8")
-        for label, needle in forbidden.items():
+        checks = dict(forbidden)
+        if path.parent.name == "workflows":
+            checks["ComicPile runtime branding"] = "ComicPile"
+        for label, needle in checks.items():
             if needle in text:
                 failures.append(f"{path}: {label}: {needle}")
     if failures:
