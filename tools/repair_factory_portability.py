@@ -66,6 +66,17 @@ def repair(path: Path) -> bool:
             "${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}",
         )
 
+        # Local runners came from Josh's ComicPile workstation setup. Keep the
+        # execution behavior but make the repository path and runtime knobs
+        # generic rather than silently defaulting to a ComicPile checkout.
+        text = text.replace("/mnt/extra/josh/code/comic-pile", "$PWD")
+        text = text.replace("COMIC_PILE_REPO", "FACTORY_SOURCE_REPO")
+        text = text.replace("COMIC_PILE_DEFAULT_MODEL", "FACTORY_DEFAULT_MODEL")
+        text = text.replace("COMIC_PILE_FACTORY_", "FACTORY_")
+        text = text.replace("COMIC_PILE_", "FACTORY_")
+        text = text.replace("comic-pile-opencode-factory", "latticery-opencode-factory")
+        text = text.replace("Source comic-pile repository", "Source repository")
+
     if path.parent.name == "workflows":
         text = text.replace("JoshCLWren/comic-pile", "${{ github.repository }}")
         # Runtime-facing names and synthetic smoke-test titles belong to the
@@ -87,6 +98,8 @@ def audit(paths: list[Path]) -> None:
         "ComicPile registry endpoint": "issues/1093",
         "ComicPile fixed exclusion set": ".number != 679 and .number != 1093 and .number != 1109",
         "ComicPile Python exclusion set": "NON_EXECUTABLE_ISSUES = {679, 1093, 1109}",
+        "ComicPile workstation path": "/mnt/extra/josh/code/comic-pile",
+        "ComicPile runtime environment prefix": "COMIC_PILE_",
     }
     failures: list[str] = []
     for path in paths:
