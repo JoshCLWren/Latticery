@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/bootstrap-factory-extraction.yml'
       - 'tools/extract_factory.py'
+      - 'tools/repair_factory_wrappers.py'
 
 permissions:
   contents: write
@@ -32,6 +33,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/extract_factory.py /tmp/comic-pile --destination "$GITHUB_WORKSPACE"
+          python3 tools/repair_factory_wrappers.py --destination "$GITHUB_WORKSPACE"
           test -f latticery/__init__.py
           test ! -e src/latticery
           test -f latticery/factory_work_controller.py
