@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SOURCE_REPO="${COMIC_PILE_REPO:-/mnt/extra/josh/code/comic-pile}"
+SOURCE_REPO="${FACTORY_SOURCE_REPO:-$PWD}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-WORKTREE="${COMIC_PILE_FACTORY_WORKTREE:-}"
-STATE_DIR="${COMIC_PILE_FACTORY_STATE_DIR:-${SOURCE_REPO%/}-factory-state}"
+WORKTREE="${FACTORY_WORKTREE:-}"
+STATE_DIR="${FACTORY_STATE_DIR:-${SOURCE_REPO%/}-factory-state}"
 MANIFEST_HELPER="$SCRIPT_DIR/opencode-model-manifest.sh"
-DEFAULT_MODEL="${COMIC_PILE_DEFAULT_MODEL:-deepseek/deepseek-v4-flash}"
+DEFAULT_MODEL="${FACTORY_DEFAULT_MODEL:-deepseek/deepseek-v4-flash}"
 MODEL=""
 AGENT="${OPENCODE_AGENT:-}"
 USE_AUTO="${OPENCODE_AUTO:-1}"
@@ -15,9 +15,9 @@ IDLE_SECONDS="${FACTORY_IDLE_SECONDS:-10}"
 FAILURE_BACKOFF_SECONDS="${FACTORY_FAILURE_BACKOFF_SECONDS:-0}"
 MAX_FAILURES="${FACTORY_MAX_FAILURES:-2}"
 MAX_SAME_ISSUE_ATTEMPTS="${FACTORY_MAX_SAME_ISSUE_ATTEMPTS:-2}"
-WAIT_FOR_SCOUT="${COMIC_PILE_FACTORY_WAIT_FOR_SCOUT:-0}"
-SCOUT_READY_FILE="${COMIC_PILE_FACTORY_SCOUT_READY_FILE:-$STATE_DIR/scout-initial-pass.done}"
-SCOUT_PID_FILE="${COMIC_PILE_FACTORY_SCOUT_PID_FILE:-}"
+WAIT_FOR_SCOUT="${FACTORY_WAIT_FOR_SCOUT:-0}"
+SCOUT_READY_FILE="${FACTORY_SCOUT_READY_FILE:-$STATE_DIR/scout-initial-pass.done}"
+SCOUT_PID_FILE="${FACTORY_SCOUT_PID_FILE:-}"
 WORKER_ID="${OPENCODE_FACTORY_WORKER_ID:-local-opencode-${HOSTNAME:-host}}"
 WORKER_ID="${WORKER_ID//[^a-zA-Z0-9._-]/-}"
 MODE="drain"
@@ -25,12 +25,12 @@ RUN_ONCE=0
 
 usage() {
   cat <<'USAGE'
-Usage: comic-pile-opencode-factory.sh [options]
+Usage: latticery-opencode-factory.sh [options]
 
 Options:
   --watch             Stay alive and poll while idle or waiting on CI.
   --once              Run exactly one factory heartbeat.
-  --repo PATH         Source comic-pile repository.
+  --repo PATH         Source repository.
   --worktree PATH     Dedicated factory worktree.
   --state-dir PATH    Factory state directory (manifest, heartbeats, scout).
   --model ID          OpenCode model id (default: rotate confirmed models).
