@@ -50,10 +50,10 @@ Individual workers still operate in loops. Latticery coordinates the graph those
 
 ## Origin
 
-Latticery is being extracted from the autonomous software factory developed inside [ComicPile](https://github.com/JoshCLWren/comic-pile). The extraction is intentionally architectural rather than a wholesale code copy: generic coordination primitives belong here; application-specific policy remains behind adapters.
+Latticery is extracted from the working autonomous software Factory developed inside [ComicPile](https://github.com/JoshCLWren/comic-pile). The working Factory is the behavioral specification: orchestration, leases, completion, review, recovery, CI gates, worker execution, and backpressure are copied first, with only host-specific assumptions parameterized. Refactoring follows extraction, not the other way around.
 
 ## Status
 
-**Early extraction.** The existing system is proven inside ComicPile, but the standalone Latticery API and package boundaries are being defined now. Expect interfaces to move while the generic runtime is separated from its first host application.
+**Working Factory extraction.** The reusable Factory implementation now lives in the top-level `latticery/` package, with its operational GitHub Actions and shell runtime preserved alongside it. ComicPile remains on its original copy until a separate cutover switches the host to consume Latticery.
 
 See [Architecture](docs/architecture.md) and the [Extraction Roadmap](docs/extraction-roadmap.md).
