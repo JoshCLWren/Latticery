@@ -7,6 +7,7 @@ on:
       - '.github/workflows/bootstrap-factory-extraction.yml'
       - 'tools/extract_factory.py'
       - 'tools/repair_factory_wrappers.py'
+      - 'tools/complete_factory_test_extraction.py'
 
 permissions:
   contents: write
@@ -34,6 +35,7 @@ jobs:
           set -Eeuo pipefail
           python3 tools/extract_factory.py /tmp/comic-pile --destination "$GITHUB_WORKSPACE"
           python3 tools/repair_factory_wrappers.py --destination "$GITHUB_WORKSPACE"
+          python3 tools/complete_factory_test_extraction.py /tmp/comic-pile --destination "$GITHUB_WORKSPACE"
           test -f latticery/__init__.py
           test ! -e src/latticery
           test -f latticery/factory_work_controller.py
@@ -41,6 +43,8 @@ jobs:
           test -f latticery/factory_completion_controller.py
           test -f .github/workflows/fixed-model-factory-dispatch.yml
           test -f .github/scripts/free-model-factory-worker.sh
+          test -f .github/factory-expected-workers.json
+          test -f tests/fixtures/opencode-catalog/keep-present.json
           test -f docs/AUTONOMOUS_FACTORY_POLICY.md
 
       - name: Preserve transformed workflows for privileged installation
