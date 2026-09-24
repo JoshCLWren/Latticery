@@ -14,11 +14,14 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      PUSH_TOKEN: ${{ secrets.PR_REBASE_TOKEN || secrets.LATTICERY_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: extract-working-factory
           fetch-depth: 0
+          token: ${{ env.PUSH_TOKEN }}
       - name: Check out current Factory source
         run: git clone --depth 1 https://github.com/JoshCLWren/comic-pile.git /tmp/comic-pile
       - name: Regenerate the exact reusable workflow surface
