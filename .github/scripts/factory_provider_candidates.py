@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for :mod:`latticery.factory_provider_candidates`."""
+"""Compatibility entry point backed by :mod:`latticery.factory_provider_candidates`."""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
 # Trusted controllers are sometimes copied to a temporary directory before a
-# PR checkout. The process still runs from the repository root, so make that
-# checkout importable without duplicating the implementation in this wrapper.
-root = Path.cwd()
-if (root / "latticery").is_dir() and str(root) not in sys.path:
-    sys.path.insert(0, str(root))
+# PR checkout. Factory jobs still execute from the repository checkout, so the
+# current working directory is the stable anchor for the packaged implementation.
+_root = Path.cwd()
+if not (_root / "latticery").is_dir():
+    raise RuntimeError(
+        "Factory compatibility wrapper must run from a repository containing latticery/"
+    )
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 
-from latticery.factory_provider_candidates import *  # noqa: F401,F403
-
-try:
-    from latticery.factory_provider_candidates import main as _main
-except ImportError:
-    _main = None
-
-if __name__ == "__main__":
-    if _main is None:
-        raise SystemExit("latticery.factory_provider_candidates has no CLI entry point")
-    raise SystemExit(_main())
+# Execute, rather than star-import, so private helpers and monkeypatching behave
+# exactly as they did when this file contained the implementation itself.
+__package__ = "latticery"
+_impl = _root / "latticery" / "factory_provider_candidates.py"
+exec(compile(_impl.read_bytes(), str(_impl), "exec"), globals(), globals())
