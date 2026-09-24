@@ -8,6 +8,7 @@ on:
       - 'tools/extract_factory.py'
       - 'tools/repair_factory_wrappers.py'
       - 'tools/complete_factory_test_extraction.py'
+      - 'tools/repair_factory_portability.py'
 
 permissions:
   contents: write
@@ -36,6 +37,7 @@ jobs:
           python3 tools/extract_factory.py /tmp/comic-pile --destination "$GITHUB_WORKSPACE"
           python3 tools/repair_factory_wrappers.py --destination "$GITHUB_WORKSPACE"
           python3 tools/complete_factory_test_extraction.py /tmp/comic-pile --destination "$GITHUB_WORKSPACE"
+          python3 tools/repair_factory_portability.py --destination "$GITHUB_WORKSPACE"
           test -f latticery/__init__.py
           test ! -e src/latticery
           test -f latticery/factory_work_controller.py
