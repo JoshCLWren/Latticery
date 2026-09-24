@@ -4,9 +4,6 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-# These marker names are durable protocol state already persisted in ComicPile
-# comments. Keep accepting/emitting them during extraction so the existing
-# factory can later cut over without losing review provenance.
 REVIEW_MARKER_RE = re.compile(
     r"^<!-- comic-pile-factory-semantic-review-v1:"
     r"pr-(?P<pr>\d+):head-(?P<head>[0-9a-f]{40}):"
@@ -29,8 +26,8 @@ def classify_ci_reconciliation(
     """Classify one exact-head CI-stage PR without invoking a worker.
 
     The caller supplies decisions from the authoritative GitHub reads and
-    gate functions. The pure boundary makes lifecycle ordering explicit and
-    keeps unknown state fail-closed.
+    gate functions.  This pure boundary makes the lifecycle ordering explicit
+    and keeps unknown state fail-closed.
     """
     if checks_decision == "retry":
         return "retry-ci"

@@ -1,6 +1,5 @@
-"""Pure ranking and lease policy for the Factory work controller."""
+"""Pure ranking and lease policy for the factory work controller."""
 from __future__ import annotations
-
 import os
 import re
 import sys
@@ -8,38 +7,21 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-
 from .factory_review_policy import producer_worker_from_pr as producer_worker_from_values
-
-
-def _configured_issue_numbers(name: str) -> set[int]:
-    """Parse a comma-separated repository-specific issue-number setting."""
-    raw = os.environ.get(name, "")
-    numbers: set[int] = set()
-    for token in raw.split(","):
-        token = token.strip()
-        if not token:
-            continue
-        try:
-            numbers.add(int(token))
-        except ValueError:
-            print(
-                f"[factory-controller] ignoring invalid {name} entry {token!r}",
-                file=sys.stderr,
-            )
-    return numbers
-
-
-# ComicPile historically hard-coded {679, 1093, 1109}. A reusable Factory must
-# not suppress unrelated issue numbers in another repository; hosts can opt in
-# with FACTORY_NON_EXECUTABLE_ISSUES when they need an equivalent deny-list.
-NON_EXECUTABLE_ISSUES = _configured_issue_numbers("FACTORY_NON_EXECUTABLE_ISSUES")
+NON_EXECUTABLE_ISSUES = {
+    int(value)
+    for value in os.environ.get('FACTORY_NON_EXECUTABLE_ISSUES', '').split(',')
+    if value.strip().isdigit()
+}
 MANUAL_ONLY_MARKER = '<!-- factory-execution:manual-only -->'
 
 OWNER_RE = re.compile('^factory:(?:unowned|local|[1-9]|[1-3][0-9]|[4-7][0-9])$')
+
 FIXED_OWNER_RE = re.compile('^factory:(?P<worker>[6-9]|[1-3][0-9]|[4-7][0-9])$')
+
 STAGE_LABELS = {'factory:building', 'factory:review', 'factory:changes-requested', 'factory:ci', 'factory:ready', 'factory:blocked'}
 STAGE_PRECEDENCE = ('factory:blocked', 'factory:ready', 'factory:review', 'factory:changes-requested', 'factory:ci', 'factory:building')
+
 INFRA_LABELS = {'infrastructure', 'e2e-infrastructure', 'policy-change', 'docs', 'documentation', 'quality-control'}
 
 # factory:blocked is reserved for a genuine terminal blocker. Model no-diff
@@ -48,7 +30,6 @@ BLOCKED_LABELS = {'factory:blocked', 'ralph-status:blocked', 'wontfix', 'invalid
 TRUSTED_ASSOCIATIONS = {'OWNER', 'MEMBER', 'COLLABORATOR'}
 TRUSTED_FACTORY_APP_SLUGS = {'github-actions'}
 REQUIRED_CHECK_FAILURE_STATES = frozenset({'CANCELLED', 'ERROR', 'FAILURE', 'STALE', 'STARTUP_FAILURE', 'TIMED_OUT'})
-# This persisted marker prefix is retained for ComicPile cutover compatibility.
 NO_DIFF_ATTEMPT_RE = re.compile(
     r'<!--\s*comic-pile-factory-claim-released-v3:'
     r'(?P<kind>issue|pr)-(?P<number>\d+):(?P<worker>[^:>\s]+):(?P<epoch>\d{10}):'
@@ -112,7 +93,6 @@ class NoDiffAttempt:
 @dataclass(frozen=True)
 class Candidate:
     """A ranked unit of executable factory work."""
-
     kind: str
     number: int
     lane: int
@@ -207,9 +187,12 @@ def linked_issue_from_pr(pr: dict[str, Any]) -> int | None:
     """Resolve the canonical linked issue for factory assignment/suppression.
 
     Prefers the durable ``factory/<worker>-<issue>-...`` branch shape, then an
-    explicit closing keyword in the body, then a leading ``Fix #N`` reference
-    in the PR title so labeled local delivery PRs still suppress duplicate issue
-    intake. Closing references are honored regardless of author or branch naming.
+    explicit closing keyword in the body (``Closes #N``/``Fixes #N``/
+    ``Resolves #N``), then a leading ``Fix #N`` reference in the PR title so
+    labeled local Cursor/fix delivery PRs still suppress duplicate issue
+    intake. Closing references are honored regardless of author or branch
+    naming: a manually opened ``local/*`` PR that explicitly owns an issue must
+    suppress fresh factory implementation (#2164).
     """
     linked = linked_issue_from_branch(str(pr.get('headRefName') or ''))
     if linked is not None:
@@ -223,7 +206,13 @@ def linked_issue_from_pr(pr: dict[str, Any]) -> int | None:
 
 
 def is_factory_managed_pr(pr: dict[str, Any]) -> bool:
-    """Return whether this PR is inside the autonomous factory work queue."""
+    """Return whether this PR is inside the autonomous factory work queue.
+
+    Canonical factory branches always qualify. Local Cursor/fix delivery PRs
+    also qualify once they carry the ``factory`` label so Josh-authored work can
+    enter review/repair/drain without rewriting the branch name. Stale
+    ``agent/`` and ``chatgpt/`` branches remain excluded even if mislabeled.
+    """
     head = str(pr.get('headRefName') or '')
     if head.startswith('factory/'):
         return True
@@ -266,7 +255,15 @@ def issue_bypasses_wip_limit(
     *,
     review_backlog_saturated: bool = False,
 ) -> bool:
-    """Keep genuinely urgent product defects executable while worker WIP is saturated."""
+    """Keep genuinely urgent product defects executable while worker WIP is saturated.
+
+    Urgent defects (main-breakage, user-reported bugs, P0/critical) bypass only
+    the worker WIP gate (>=5 leased PRs). When review_backlog_saturated is set,
+    end-to-end backpressure takes over: user-reported bugs and P0 issues must
+    wait like everything else so the fleet drains existing completion-stage PRs
+    instead of manufacturing unbounded new intake. Only main-breakage keeps
+    opening new work once the review backlog is saturated.
+    """
     labels = labels_of(issue)
     if review_backlog_saturated:
         return 'main-breakage' in labels
@@ -279,7 +276,13 @@ def issue_bypasses_wip_limit(
 
 
 def factory_review_backlog_count(prs: Iterable[dict[str, Any]]) -> int:
-    """Count factory PRs waiting in completion stages."""
+    """Count factory PRs waiting in completion stages.
+
+    Owned and unowned review/ci/changes-requested PRs both consume fleet time
+    before merge. Counting only unowned PRs under-reported pressure when
+    reviewers held leases, so intake kept opening work while promotion stalled
+    (incident #2309). Ready PRs remain excluded: the merge drain owns them.
+    """
     count = 0
     for pr in prs:
         if str(pr.get('state') or 'OPEN').upper() != 'OPEN' or pr.get('isDraft'):
@@ -295,7 +298,13 @@ def factory_review_backlog_count(prs: Iterable[dict[str, Any]]) -> int:
 
 
 def factory_ready_count(prs: Iterable[dict[str, Any]]) -> int:
-    """Count open factory PRs parked at the factory:ready merge gate."""
+    """Count open factory PRs parked at the factory:ready merge gate.
+
+    Neither the worker WIP counter nor the review-backlog counter sees ready
+    PRs because they consume no lease and wait outside the completion stages.
+    During a red-main pause that pile can grow unbounded, so this aggregate
+    exposes it for callers reporting end-to-end backpressure health.
+    """
     count = 0
     for pr in prs:
         if str(pr.get('state') or 'OPEN').upper() != 'OPEN' or pr.get('isDraft'):
@@ -311,7 +320,12 @@ def factory_ready_count(prs: Iterable[dict[str, Any]]) -> int:
 
 
 def factory_pr_wip_count(prs: Iterable[dict[str, Any]]) -> int:
-    """Count factory PRs that currently consume a worker lease."""
+    """Count factory PRs that currently consume a worker lease.
+
+    Queue depth is not worker WIP. Unowned PRs waiting for a reviewer and PRs in
+    factory:ready waiting for the merge drain consume no fixed-model worker
+    capacity, so they must not shut off issue intake merely by existing.
+    """
     count = 0
     for pr in prs:
         if str(pr.get('state') or 'OPEN').upper() != 'OPEN' or pr.get('isDraft'):
@@ -357,7 +371,13 @@ def matching_pr_no_diff_attempts(
     stage: str | None,
     conflicted: bool,
 ) -> int:
-    """Count no-diff retries that still apply to this exact PR generation."""
+    """Count no-diff retries that still apply to this exact PR generation.
+
+    Only markers that pin the current head SHA, workflow stage, and conflict
+    state consume the retry budget. A new push, newly actionable review stage,
+    or newly developed merge conflict starts a fresh budget immediately.
+    Unscoped legacy PR markers do not suppress a known current generation.
+    """
     current_sha = head_sha.strip().lower()
     if not current_sha:
         return 0
@@ -412,6 +432,9 @@ def pr_is_static_candidate(
     if str(pr.get('state') or 'OPEN').upper() != 'OPEN' or pr.get('isDraft'):
         return False
     labels = labels_of(pr)
+    # Human-authored agent/* and chatgpt/* PRs are not autonomous factory work,
+    # even if a stale/mistaken factory label was applied to them. Labeled local
+    # Cursor/fix delivery PRs are admitted so they can finish through review.
     if not is_factory_managed_pr(pr):
         return False
     if labels & BLOCKED_LABELS or 'factory:ready' in labels:
@@ -423,14 +446,35 @@ def pr_is_static_candidate(
     linked = linked_issue_from_pr(pr)
     if linked is not None and linked in issue_map:
         issue_labels = labels_of(issue_map[linked])
+        # An existing canonical PR remains executable even when its linked
+        # issue carries a stale/terminal blocker from an earlier attempt. The
+        # PR's own stage and blocker labels govern whether it can be repaired
+        # or reviewed; requiring the issue to be unblocked strands
+        # factory:review and factory:changes-requested PRs permanently.
         if not item_is_unowned(issue_labels):
             return False
     return True
 
 
 def pr_suppresses_issue_candidate(pr: dict[str, Any], issue_map: dict[int, dict[str, Any]]) -> bool:
-    """Return whether an open PR is canonical work for its issue."""
-    del issue_map
+    """Return whether an open PR is canonical work for its issue.
+
+    Any open PR that claims an issue — a ``factory/<worker>-<issue>-...``
+    branch, an explicit ``Closes #N``/``Fixes #N``/``Resolves #N`` reference
+    in its body, or a ``Fix #N`` title — owns that issue regardless of author
+    or branch naming. Once canonical work exists, the issue must not become
+    fresh implementation work again for any reason. Closing or explicitly
+    superseding the PR releases the issue. Urgency changes ranking, never
+    canonical PR identity.
+
+    Factory provenance is intentionally NOT required here: a manually opened
+    ``local/*`` (or any other) PR that explicitly closes an issue is the same
+    canonical implementation candidate and must suppress duplicate factory
+    intake (#2164). Draft PRs still claim identity for the same fail-closed
+    reason; the issue re-enters fresh implementation only when the PR is
+    actually closed or superseded.
+    """
+    del issue_map  # Kept in the signature for compatibility with existing callers.
     return (
         str(pr.get('state') or 'OPEN').upper() == 'OPEN'
         and linked_issue_from_pr(pr) is not None
@@ -438,7 +482,13 @@ def pr_suppresses_issue_candidate(pr: dict[str, Any], issue_map: dict[int, dict[
 
 
 def _leading_reference_numbers(text: str) -> set[int]:
-    """Return the '#N' references at the head of a dependency declaration."""
+    """Return the '#N' references at the head of a dependency declaration.
+
+    Only the leading reference cluster counts: consecutive ``#N`` tokens
+    joined by separators such as ``and``, ``,``, or ``+``.  Prose or casual
+    ``#N`` mentions later on the line end the cluster so they never become
+    blocking prerequisites.
+    """
     result: set[int] = set()
     for token in text.split():
         clean = token.rstrip(',.;:')
@@ -451,7 +501,12 @@ def _leading_reference_numbers(text: str) -> set[int]:
 
 
 def parse_depends_on_numbers(body: str) -> set[int]:
-    """Return issue numbers declared as explicit prerequisites in the body."""
+    """Return issue numbers declared as explicit prerequisites in the body.
+
+    Only matches the canonical ``Depends on #NNN`` / ``Depends on #N, #M``
+    format used by structured issue declarations.  Casual ``#N`` mentions
+    elsewhere in the body are not treated as blocking prerequisites.
+    """
     numbers: set[int] = set()
     for match in DEP_ON_RE.finditer(body):
         numbers.update(_leading_reference_numbers(match.group(1)))
@@ -505,6 +560,10 @@ def build_candidates(
             issue,
             review_backlog_saturated=True,
         ):
+            # End-to-end backpressure: while the completion stages are
+            # saturated, the fleet drains existing PRs instead of
+            # manufacturing new ones. Only main-breakage bypasses this gate
+            # when the review backlog is saturated (>= FACTORY_REVIEW_BACKLOG_LIMIT).
             continue
         labels = labels_of(issue)
         candidates.append(
@@ -536,6 +595,10 @@ def build_candidates(
             no_diff_attempts=pr_attempts,
         ):
             continue
+        # Recent no-diff retries suppress only the unchanged execution
+        # generation. A new head, newly actionable review stage, or newly
+        # developed merge conflict starts a fresh budget without rewriting
+        # truthful labels to factory:blocked.
         linked = linked_issue_from_pr(pr)
         labels = set(pr_labels)
         if linked is not None and linked in issue_map:
@@ -560,14 +623,23 @@ def build_candidates(
 
 
 def review_share_for_backlog(review_backlog: int) -> float:
-    """Return the review-first worker share for the current completion pressure."""
+    """Return the review-first worker share for the current completion pressure.
+
+    Uses a continuous ratio instead of hard-coded absolute tiers: 25% at idle,
+    rising to 90% as completion-stage backlog approaches a reference depth of 20.
+    """
     depth = max(0, int(review_backlog))
     return min(0.90, 0.25 + (0.65 * min(depth, 20) / 20.0))
 
 
 def review_capacity_worker(worker: str, *, review_backlog: int = 0) -> bool:
-    """Return whether this worker slot prioritizes review under current pressure."""
+    """Return whether this worker slot prioritizes review under current pressure.
+
+    Membership in the review-first cohort is deterministic from the worker id and
+    the ratio from :func:`review_share_for_backlog`.
+    """
     share = review_share_for_backlog(review_backlog)
+    # Multiply by a fixed odd constant so nearby worker ids do not clump.
     return (int(worker) * 37) % 100 < int(round(share * 100))
 
 
@@ -594,6 +666,9 @@ def order_candidates_for_worker(candidates: list[Candidate], worker: str) -> lis
         if candidate.lane == 0:
             return 0
         if candidate.kind == 'pr':
+            # A clean review-stage PR is one independent approval from merge.
+            # Review-first workers finish it ahead of everything but lane 0;
+            # non-review workers preserve product capacity (issue first).
             if candidate.stage == 'factory:review' and not candidate.conflicted:
                 return 1 if review_first else 6
             if candidate.conflicted:
@@ -676,21 +751,15 @@ def no_diff_attempts_from_comments(
     return counts
 
 
-def lease_is_stale(
-    owner: str,
-    *,
-    active_fixed_workers: set[int],
-    has_unresolved_active_runs: bool | None = None,
-    latest_activity_epoch: int | None,
-    now_epoch: int,
-    local_ttl_seconds: int = LOCAL_LEASE_TTL_SECONDS,
-    fixed_ttl_seconds: int = FIXED_LEASE_TTL_SECONDS,
-) -> bool:
+def lease_is_stale(owner: str, *, active_fixed_workers: set[int], has_unresolved_active_runs: bool | None = None, latest_activity_epoch: int | None, now_epoch: int, local_ttl_seconds: int=LOCAL_LEASE_TTL_SECONDS, fixed_ttl_seconds: int=FIXED_LEASE_TTL_SECONDS) -> bool:
     """Return whether a factory lease can be proven stale."""
     if owner == 'factory:local':
         return latest_activity_epoch is not None and now_epoch - latest_activity_epoch > local_ttl_seconds
     match = FIXED_OWNER_RE.fullmatch(owner)
     if match:
+        # Callers predating the run-identity fence did not provide this bit.
+        # Preserve their conservative legacy decision while current callers
+        # pass an explicit value and therefore fail closed on unknown runs.
         if has_unresolved_active_runs is None:
             return int(match.group('worker')) not in active_fixed_workers
         if has_unresolved_active_runs:

@@ -25,6 +25,8 @@ def omniroute_enabled(raw: str | None = None) -> bool:
     return value.strip().lower() in {"1", "on", "true", "yes"}
 
 
+
+
 @dataclass(frozen=True)
 class FleetDemand:
     """Current executable work and idle worker capacity."""
@@ -55,7 +57,20 @@ def remaining_omniroute_free_entry_slots(
     cap: int = DEFAULT_OMNIROUTE_FREE_ENTRY_CAP,
     enabled: bool | None = None,
 ) -> int:
-    """Return how many new OmniRoute free Entry sessions may start."""
+    """Return how many new OmniRoute free Entry sessions may start.
+
+    Args:
+        in_flight: Occupied Entry runs plus equivalent fixed-model leases.
+        cap: Maximum concurrent OmniRoute free-entry units.
+        enabled: Optional override for the OmniRoute enable gate. When omitted,
+            reads ``FACTORY_OMNIROUTE_ENABLED`` (default off).
+
+    Returns:
+        Non-negative remaining slots. When OmniRoute is disabled, uses the multi-provider Entry budget so service can continue without OmniRoute.
+
+    Raises:
+        ValueError: If ``in_flight`` or ``cap`` is negative.
+    """
     if enabled is None:
         enabled = omniroute_enabled()
     if in_flight < 0:
@@ -63,6 +78,8 @@ def remaining_omniroute_free_entry_slots(
     if cap < 0:
         raise ValueError("omniroute free entry cap cannot be negative")
     if not enabled:
+        # OmniRoute dark: always use the multi-provider Entry budget.
+        # Callers that need a custom budget pass enabled=True with their cap.
         return max(0, DEFAULT_MULTI_PROVIDER_ENTRY_CAP - in_flight)
     return max(0, cap - in_flight)
 
@@ -73,7 +90,17 @@ def apply_omniroute_free_entry_cap(
     *,
     cap: int = DEFAULT_OMNIROUTE_FREE_ENTRY_CAP,
 ) -> FleetDemand:
-    """Bound idle workers to remaining OmniRoute free-entry slots."""
+    """Bound idle workers to remaining OmniRoute free-entry slots.
+
+    Args:
+        demand: Uncapped completion/production demand and idle fleet size.
+        in_flight: Occupied Entry runs plus equivalent fixed-model leases.
+        cap: Maximum concurrent OmniRoute free-entry units.
+
+    Returns:
+        The original demand when idle workers already fit the remaining
+        slots; otherwise a copy whose idle count equals remaining slots.
+    """
     remaining = remaining_omniroute_free_entry_slots(in_flight, cap=cap)
     if remaining >= demand.idle_workers:
         return demand
@@ -85,7 +112,15 @@ def apply_omniroute_free_entry_cap(
 
 
 def completion_worker_target(demand: FleetDemand) -> int:
-    """Allocate idle workers proportionally to live completion demand."""
+    """Allocate idle workers proportionally to live completion demand.
+
+    The allocator is work-conserving and derived from current queue figures:
+    - no completion demand consumes no completion workers;
+    - no production demand lets completion consume the idle fleet;
+    - mixed demand receives a proportional share of idle capacity;
+    - any non-empty completion queue gets at least one worker when capacity exists;
+    - assignments never exceed either completion queue depth or idle capacity.
+    """
     if demand.completion == 0 or demand.idle_workers == 0:
         return 0
     if demand.production == 0:

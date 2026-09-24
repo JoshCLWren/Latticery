@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Select the next executable GitHub issue for an agent."""
 
 from __future__ import annotations
@@ -131,7 +132,7 @@ def _run_gh(command: list[str], failure_message: str) -> str:
 
 
 def _run_gh_json(command: list[str], failure_message: str) -> object:
-    """Run GitHub CLI and decode its JSON output."""
+    """Run a GitHub CLI command and decode its JSON output."""
     try:
         payload = json.loads(_run_gh(command, failure_message))
     except json.JSONDecodeError as error:
@@ -164,7 +165,7 @@ def _issue_context(issue: IssuePayload, closed_numbers: set[int]) -> str:
         body.strip(),
         f"Dependencies: {dependency_text}",
         f"Required files named by issue: {files_text}",
-        "Required verification: follow repository agent instructions and the issue acceptance criteria.",
+        "Required verification: follow AGENTS.md and the issue acceptance criteria.",
     ]
 
     return "\n".join(lines)
@@ -272,7 +273,7 @@ def main() -> int:
     print(f"Labels: {labels}")
     print()
     print(_issue_context(issue, closed_numbers))
-    print("Agent context: read the repository agent instructions and execution policy.")
+    print("Agent context: read AGENTS.md and docs/ISSUE_EXECUTION_PROTOCOL.md.")
     print("If the issue has a linked local plan, read that plan before editing.")
     return 0
 
