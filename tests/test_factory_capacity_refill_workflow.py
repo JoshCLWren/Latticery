@@ -35,7 +35,7 @@ def test_attempt_registry_pages_are_slurped_exactly_once() -> None:
     text = _workflow_text()
 
     assert 'gh api --paginate --slurp' not in text
-    assert 'gh api --paginate \\\n                "repos/${GITHUB_REPOSITORY}/issues/1093/comments?per_page=100"' in text
+    assert 'gh api --paginate \\\n                "repos/${GITHUB_REPOSITORY}/issues/${FACTORY_REGISTRY_ISSUE:?FACTORY_REGISTRY_ISSUE is required}/comments?per_page=100"' in text
     assert '| jq -rs --arg run "$COMPLETED_RUN_ID"' in text
 
 

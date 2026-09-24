@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import json
 import sys
@@ -11,21 +12,15 @@ from types import ModuleType
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / ".github" / "scripts"
+SCRIPTS = ROOT / "latticery"
 FIXTURES = ROOT / "tests" / "fixtures" / "opencode-catalog"
 
 
 def _load(name: str, filename: str) -> ModuleType:
-    """Load a ``.github/scripts`` module without packaging that tree."""
-    sys.path.insert(0, str(SCRIPTS))
-    path = SCRIPTS / filename
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Load the extracted package module while preserving test call sites."""
+    del name
+    module = filename.removesuffix(".py").replace("-", "_")
+    return importlib.import_module(f"latticery.{module}")
 
 
 ROSTER = _load("factory_roster_discovery_test", "factory_roster.py")

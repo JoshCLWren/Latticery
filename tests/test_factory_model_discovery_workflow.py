@@ -90,8 +90,8 @@ def test_discovery_consumes_nvidia_410_markers_from_issue_1093() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = FACTORY_RUN.read_text(encoding="utf-8")
 
-    assert "issues/1093/comments" in workflow
+    assert "issues/${FACTORY_REGISTRY_ISSUE:?FACTORY_REGISTRY_ISSUE is required}/comments" in workflow
     assert "--retirement-comments" in workflow
     assert "factory-model-retired-410:v1" in workflow
     assert "retirement_marker='<!-- factory-model-retired-410:v1 -->'" in runner
-    assert 'gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/1093/comments?per_page=100"' in runner
+    assert 'gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${FACTORY_REGISTRY_ISSUE:?FACTORY_REGISTRY_ISSUE is required}/comments?per_page=100"' in runner
