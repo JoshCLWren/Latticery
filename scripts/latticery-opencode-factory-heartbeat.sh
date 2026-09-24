@@ -870,9 +870,9 @@ printf '  Worker ID:   %s\n' "$WORKER_ID"
 
 report_counts() {
   local open_prs open_issues pending_campaign active_claims
-  open_prs="$(gh pr list --repo JoshCLWren/comic-pile --state open --limit 1000 --json number --jq 'length' 2>/dev/null || printf '?')"
-  open_issues="$(gh issue list --repo JoshCLWren/comic-pile --state open --limit 1000 --json number --jq 'length' 2>/dev/null || printf '?')"
-  pending_campaign="$(gh issue list --repo JoshCLWren/comic-pile --state open --limit 1000 --label ralph-task --label ralph-status:pending --json number --jq 'length' 2>/dev/null || printf '?')"
+  open_prs="$(gh pr list --repo ${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}} --state open --limit 1000 --json number --jq 'length' 2>/dev/null || printf '?')"
+  open_issues="$(gh issue list --repo ${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}} --state open --limit 1000 --json number --jq 'length' 2>/dev/null || printf '?')"
+  pending_campaign="$(gh issue list --repo ${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}} --state open --limit 1000 --label ralph-task --label ralph-status:pending --json number --jq 'length' 2>/dev/null || printf '?')"
   active_claims="$(awk -F'\t' 'NR>1 && $8!="released" && $8!="merged"' "$LEDGER" 2>/dev/null | wc -l)"
   printf '  GitHub queue: %s open PR(s), %s open issue(s), %s pending, %s ledger claim(s)\n' \
     "$open_prs" "$open_issues" "$pending_campaign" "$active_claims"

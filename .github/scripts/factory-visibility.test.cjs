@@ -185,12 +185,12 @@ test('PR synchronize events refresh owner and stage from the linked issue', asyn
     github,
     context: contextFor('pull_request_target', {
       action: 'synchronize',
-      repository: { full_name: 'JoshCLWren/comic-pile' },
+      repository: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
       pull_request: {
         body: 'Closes #999',
         head: {
           ref: 'factory/999-atomic-label-reconciliation',
-          repo: { full_name: 'JoshCLWren/comic-pile' },
+          repo: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
         },
         labels: [{ name: 'factory' }],
         number: 1000,
@@ -221,12 +221,12 @@ test('PR refresh preserves a Factory 32 PR-local owner', async () => {
     github,
     context: contextFor('pull_request_target', {
       action: 'synchronize',
-      repository: { full_name: 'JoshCLWren/comic-pile' },
+      repository: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
       pull_request: {
         body: 'Closes #1089',
         head: {
           ref: 'factory/32-1089-omni',
-          repo: { full_name: 'JoshCLWren/comic-pile' },
+          repo: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
         },
         labels: [{ name: 'factory' }, { name: 'factory:32' }],
         number: 1202,
@@ -259,12 +259,12 @@ test('released fixed-model PR resolves closing issue instead of worker branch nu
     github,
     context: contextFor('pull_request_target', {
       action: 'synchronize',
-      repository: { full_name: 'JoshCLWren/comic-pile' },
+      repository: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
       pull_request: {
         body: 'Closes #1089',
         head: {
           ref: 'factory/32-1089-omni',
-          repo: { full_name: 'JoshCLWren/comic-pile' },
+          repo: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
         },
         labels: [{ name: 'factory' }, { name: 'factory:unowned' }],
         number: 1202,
@@ -306,12 +306,12 @@ test('PR refresh preserves one external owner after the linked issue is released
     github,
     context: contextFor('pull_request_target', {
       action: 'synchronize',
-      repository: { full_name: 'JoshCLWren/comic-pile' },
+      repository: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
       pull_request: {
         body: 'Closes #1149',
         head: {
           ref: 'factory/1149-omniroute',
-          repo: { full_name: 'JoshCLWren/comic-pile' },
+          repo: { full_name: '${FACTORY_REPOSITORY:-${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}}' },
         },
         labels: [
           { name: 'factory' },

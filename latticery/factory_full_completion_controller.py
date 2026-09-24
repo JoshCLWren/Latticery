@@ -69,7 +69,7 @@ def current_demand(controller, *, now_epoch: int | None = None) -> tuple[FleetDe
     completion, production = raw_work_demand(policy, issues, prs)
 
     now_epoch = int(time.time()) if now_epoch is None else now_epoch
-    manifest = Path(__file__).resolve().parents[1] / "free-model-factories.tsv"
+    manifest = Path(__file__).resolve().parents[1] / ".github" / "free-model-factories.tsv"
     candidates = controller.load_manifest_candidates(manifest)
     owned = controller.owned_worker_ids([*issues, *prs])
     try:

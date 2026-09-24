@@ -253,7 +253,7 @@ def latest_worker_health(
             priorities[worker] = priority_value
 
     if candidates is None:
-        manifest = Path(__file__).resolve().parents[1] / "free-model-factories.tsv"
+        manifest = Path(__file__).resolve().parents[1] / ".github" / "free-model-factories.tsv"
         candidates = load_manifest_candidates(manifest)
     now_epoch = int(time.time()) if now_epoch is None else now_epoch
     trusted_comments = (
@@ -555,7 +555,7 @@ def assign_completion_batch(*, now_epoch: int | None = None) -> dict[str, object
     if backlog < REVIEW_BACKLOG_LIMIT:
         return {"backlog": backlog, "selected_workers": [], "assignments": []}
 
-    manifest = Path(__file__).resolve().parents[1] / "free-model-factories.tsv"
+    manifest = Path(__file__).resolve().parents[1] / ".github" / "free-model-factories.tsv"
     workers = load_manifest_workers(manifest)
     owned = owned_worker_ids([*issues, *prs])
     try:

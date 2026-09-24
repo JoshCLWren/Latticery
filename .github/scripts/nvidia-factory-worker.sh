@@ -73,7 +73,7 @@ choose_issue() {
   local label
   for label in "${labels[@]}"; do args+=(--label "$label"); done
   gh "${args[@]}" | jq -r --arg owner_re "$OWNER_RE" '
-    map(select(.number != 679 and .number != 1093 and .number != 1109))
+    map(select(.number as $number | ((env.FACTORY_NON_EXECUTABLE_ISSUES // "" | split(",") | map(tonumber?)) | index($number) | not)))
     | map(select((([.labels[].name | select(test($owner_re) and . != "factory:unowned")] | length) == 0)))
     | sort_by(.createdAt) | reverse | .[].number'
 }
@@ -150,7 +150,7 @@ current_head_review_blockers() {
   local changes unresolved
   changes="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${pr}/reviews?per_page=100" | jq -s --arg head "$head" '[.[][] | select(.state == "CHANGES_REQUESTED" and .commit_id == $head)] | length')"
   [[ "$changes" == "0" ]] || return 1
-  unresolved="$(gh api graphql -F owner='JoshCLWren' -F name='comic-pile' -F number="$pr" -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}' --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')"
+  unresolved="$(gh api graphql -F owner="${GITHUB_REPOSITORY%%/*}" -F name="${GITHUB_REPOSITORY#*/}" -F number="$pr" -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}' --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')"
   [[ "$unresolved" == "0" ]]
 }
 
